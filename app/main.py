@@ -83,6 +83,9 @@ ENCRYPTED_LINK_CACHE_TTL = int(os.getenv("ENCRYPTED_LINK_CACHE_TTL_SECONDS", "30
 encrypted_link_cache: dict[int, tuple[str, int]] = {}
 encrypted_link_cache_lock = threading.Lock()
 
+# Максимум параллельных вызовов crypto API
+CRYPTO_API_CONCURRENCY = int(os.getenv("CRYPTO_API_CONCURRENCY", "5"))
+
 
 def get_cached_encrypted_link(user_id: int) -> str | None:
     """Возвращает закэшированную encrypted link, если она не истекла."""
@@ -728,36 +731,50 @@ def call_crypto_api(target_url: str, api_url: str = "https://crypto.happ.su/api-
 
 
 async def encrypt_links_for_all_users(base_url: str) -> None:
-    """Precompute encrypted happ:// links for all active users and store them in DB."""
+    """Precompute encrypted happ:// links for all active users and store them in DB.
+
+    Uses a semaphore to limit concurrency and avoid overwhelming the crypto API.
+    """
     user_ids = storage.list_active_user_ids()
     if not user_ids:
         return
-    for uid in user_ids:
-        try:
-            expires = int(time.time()) + SUBSCRIPTION_LINK_TTL
-            payload = f"subscription.txt:{uid}:{expires}"
-            sig = hmac.new(SIGNING_KEY, payload.encode(), hashlib.sha256).hexdigest()
-            signed_url = f"{base_url.rstrip('/')}/subscription.txt?expires={expires}&uid={uid}&sig={sig}"
 
-            # call crypto API in thread to avoid blocking event loop
+    # Limit concurrent crypto API calls to avoid rate limiting by the API
+    sem = asyncio.Semaphore(CRYPTO_API_CONCURRENCY)
+    now = int(time.time())
+
+    async def encrypt_one(uid: int) -> None:
+        """Encrypt a single user's subscription link."""
+        async with sem:
             try:
-                resp = await asyncio.to_thread(call_crypto_api, signed_url)
-            except Exception as e:
-                print(f"crypto API call failed for uid={uid}: {e}", file=sys.stderr)
-                continue
+                expires = now + SUBSCRIPTION_LINK_TTL
+                payload = f"subscription.txt:{uid}:{expires}"
+                sig = hmac.new(SIGNING_KEY, payload.encode(), hashlib.sha256).hexdigest()
+                signed_url = f"{base_url.rstrip('/')}/subscription.txt?expires={expires}&uid={uid}&sig={sig}"
 
-            encrypted = resp.strip()
-            if encrypted.startswith('{'):
+                # call crypto API in thread to avoid blocking event loop
                 try:
-                    data = json.loads(encrypted)
-                    encrypted = (data.get('encrypted_link') or '').strip()
-                except Exception:
-                    encrypted = ''
-            if encrypted.startswith('happ://'):
-                # store link and expiry (as epoch seconds string)
-                await asyncio.to_thread(storage.upsert_encrypted_link, uid, encrypted, str(expires))
-        except Exception as exc:
-            print(f"encrypt_links_for_all_users error for uid={uid}: {exc}", file=sys.stderr)
+                    resp = await asyncio.to_thread(call_crypto_api, signed_url)
+                except Exception as e:
+                    print(f"crypto API call failed for uid={uid}: {e}", file=sys.stderr)
+                    return
+
+                encrypted = resp.strip()
+                if encrypted.startswith('{'):
+                    try:
+                        data = json.loads(encrypted)
+                        encrypted = (data.get('encrypted_link') or '').strip()
+                    except Exception:
+                        encrypted = ''
+                if encrypted.startswith('happ://'):
+                    # store link and cache in memory
+                    await asyncio.to_thread(storage.upsert_encrypted_link, uid, encrypted, str(expires))
+                    set_cached_encrypted_link(uid, encrypted, expires)
+            except Exception as exc:
+                print(f"encrypt_links_for_all_users error for uid={uid}: {exc}", file=sys.stderr)
+
+    # Run all encryption tasks concurrently with bounded concurrency
+    await asyncio.gather(*(encrypt_one(uid) for uid in user_ids))
 
 
 def _get_deep_link(request: Request, user_id: int) -> str:
