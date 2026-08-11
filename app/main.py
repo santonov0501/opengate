@@ -332,7 +332,9 @@ def make_signed_subscription_url(request: Request, filename: str, user_id: int) 
     expires = int(time.time()) + SUBSCRIPTION_LINK_TTL
     payload = f"{filename}:{user_id}:{expires}"
     sig = hmac.new(SIGNING_KEY, payload.encode(), hashlib.sha256).hexdigest()
-    target_url = f"{request.base_url}{filename}?expires={expires}&uid={user_id}&sig={sig}"
+    # Use PUBLIC_BASE_URL if configured to ensure HTTPS scheme
+    base_url = PUBLIC_BASE_URL if PUBLIC_BASE_URL else str(request.base_url)
+    target_url = f"{base_url}{filename}?expires={expires}&uid={user_id}&sig={sig}"
     if PROVIDER_ID:
         target_url = f"{target_url}#?providerid={urllib.parse.quote(PROVIDER_ID)}"
     return target_url
@@ -391,7 +393,9 @@ def make_signed_redirect_url(request: Request, user_id: int) -> str:
     expires = int(time.time()) + SUBSCRIPTION_LINK_TTL
     payload = f"redirect:{user_id}:{expires}"
     sig = hmac.new(SIGNING_KEY, payload.encode(), hashlib.sha256).hexdigest()
-    return f"{request.base_url}subscription-redirect?expires={expires}&uid={user_id}&sig={sig}"
+    # Use PUBLIC_BASE_URL if configured to ensure HTTPS scheme
+    base_url = PUBLIC_BASE_URL if PUBLIC_BASE_URL else str(request.base_url)
+    return f"{base_url}subscription-redirect?expires={expires}&uid={user_id}&sig={sig}"
 
 
 def verify_signed_redirect(request: Request) -> int | None:
