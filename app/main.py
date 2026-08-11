@@ -16,6 +16,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -70,6 +71,32 @@ else:
 # Сессии: token -> (user_id, expires_at)
 sessions: dict[str, tuple[int, datetime]] = {}
 sessions_lock = threading.Lock()
+
+# Rate limiting для /auth/login: ip -> deque(timestamps)
+LOGIN_RATE_LIMIT = int(os.getenv("LOGIN_RATE_LIMIT", "10"))  # max attempts
+LOGIN_RATE_WINDOW = int(os.getenv("LOGIN_RATE_WINDOW_SECONDS", "60"))  # per window
+login_attempts: dict[str, deque[float]] = defaultdict(deque)
+login_attempts_lock = threading.Lock()
+
+
+def check_login_rate_limit(ip: str) -> None:
+    """Проверяет лимит попыток входа для IP-адреса.
+
+    Использует sliding window: удаляет попытки старше окна,
+    затем проверяет количество попыток в текущем окне.
+    """
+    now = time.time()
+    with login_attempts_lock:
+        attempts = login_attempts[ip]
+        # Удаляем устаревшие попытки
+        while attempts and now - attempts[0] > LOGIN_RATE_WINDOW:
+            attempts.popleft()
+        if len(attempts) >= LOGIN_RATE_LIMIT:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many login attempts. Please try again later.",
+            )
+        attempts.append(now)
 
 
 class CommandResult(BaseModel):
@@ -365,26 +392,6 @@ def verify_signed_file(request: Request, filename: str) -> int | None:
     return user_id
 
 
-def resolve_file_user_id(request: Request, filename: str, user: dict | None) -> int | None:
-    """Определяет user_id для выдачи файла подписки.
-
-    Приоритет: подписанный URL (uid) -> авторизованная сессия.
-    """
-    signed_uid = verify_signed_file(request, filename)
-    if signed_uid is not None:
-        return signed_uid
-    if user:
-        return user["id"]
-    return None
-
-
-def require_file_access(request: Request, filename: str, user: dict | None = None) -> None:
-    """Доступ к файлу подписки: либо авторизованная сессия, либо подписанный URL."""
-    if verify_signed_file(request, filename) is not None:
-        return
-    get_current_user(request)
-
-
 def make_signed_redirect_url(request: Request, user_id: int) -> str:
     """Создаёт подписанный URL на /subscription-redirect-302.
 
@@ -543,6 +550,10 @@ def auth_login(request: Request, body: LoginRequest) -> LoginResponse:
     Принимает initData из window.Telegram.WebApp.initData.
     Сервер проверяет HMAC-подпись и выдаёт токен сессии.
     """
+    # Rate limiting по IP
+    client_ip = request.client.host if request.client else "unknown"
+    check_login_rate_limit(client_ip)
+
     user = verify_init_data(body.init_data)
     user = storage.upsert_user(user)
     token, expires_at = create_session(user["id"])
@@ -648,17 +659,6 @@ async def stop_build_subscription(user: dict = Depends(get_current_user)) -> Man
 # ---------------------------------------------------------------------------
 # Файлы подписки (защищены: сессия ИЛИ подписанный URL для Happ)
 # ---------------------------------------------------------------------------
-
-def _profile_title(user_id: int) -> str:
-    return f"OpenGate {user_id}"
-
-
-def _read_subscription_lines() -> list[str]:
-    rows = storage.list_key_rows()
-    if not rows:
-        raise HTTPException(status_code=404, detail="Keys not found. Run POST /pull-keys first.")
-    return [row["uri"] for row in rows]
-
 
 @app.get("/subscription.txt", response_class=PlainTextResponse)
 def subscription_txt(request: Request) -> PlainTextResponse:
