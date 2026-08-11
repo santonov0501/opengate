@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Happ Subscription</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: #1c1c1e;
+      --text: #ffffff;
+      --hint: #8e8e93;
+      --button: #2aabee;
+      --button-text: #ffffff;
+      --secondary: #2c2c2e;
+      --danger: #ff453a;
+      --ok: #30d158;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      min-height: 100dvh;
+      padding:
+        calc(20px + var(--safe-top))
+        20px
+        calc(24px + var(--safe-bottom));
+    }
+
+    .screen {
+      max-width: 420px;
+      margin: 0 auto;
+      min-height: calc(100dvh - 44px - var(--safe-top) - var(--safe-bottom));
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.45rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      margin: 6px 0 0;
+      color: var(--hint);
+      font-size: 0.92rem;
+      line-height: 1.35;
+    }
+
+    .card {
+      background: var(--secondary);
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .label {
+      color: var(--hint);
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .value {
+      font-size: 0.98rem;
+      font-weight: 600;
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--button) 18%, transparent);
+      color: var(--text);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .chip-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--button);
+    }
+
+    .actions {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #subscribe-btn {
+      appearance: none;
+      border: 0;
+      border-radius: 12px;
+      padding: 15px 18px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      background: var(--button);
+      color: var(--button-text);
+      cursor: pointer;
+      width: 100%;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+
+    #subscribe-btn:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    #subscribe-btn:disabled {
+      opacity: 0.55;
+      cursor: default;
+    }
+
+    #status {
+      min-height: 1.35em;
+      color: var(--hint);
+      font-size: 0.9rem;
+      line-height: 1.4;
+      text-align: center;
+    }
+
+    #status.is-error {
+      color: var(--danger);
+    }
+
+    #status.is-ok {
+      color: var(--ok);
+    }
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <header>
+      <h1>Happ Subscription</h1>
+      <p>Создайте подписку и откройте её в приложении Happ</p>
+    </header>
+
+    <section class="card" aria-label="Информация">
+      <div class="row">
+        <span class="label">Ключи обновлены</span>
+        <span class="value" id="keys-updated">Загрузка…</span>
+      </div>
+      <div class="row">
+        <span class="label">Устройство</span>
+        <span class="chip" id="device-chip">
+          <span class="chip-dot" aria-hidden="true"></span>
+          <span id="device-label">…</span>
+        </span>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button type="button" id="subscribe-btn">Создать подписку</button>
+      <div id="status" role="status" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const POLL_MS = 1800;
+      const LINK_TIMEOUT_MS = 120000;
+      const ACTIVE_MINUTES = 5;
+      const TOKEN_KEY = "happ_sub_token";
+
+      const keysUpdatedEl = document.getElementById("keys-updated");
+      const deviceLabelEl = document.getElementById("device-label");
+      const subscribeBtn = document.getElementById("subscribe-btn");
+      const statusEl = document.getElementById("status");
+
+      let subscriptionLink = null;
+      let creating = false;
+      let authToken = null;
+
+      // Attach listeners FIRST so the button is always clickable,
+      // even if anything below throws.
+      subscribeBtn.addEventListener("click", onSubscribeClick);
+      subscribeBtn.addEventListener("touchend", onSubscribeClick, { passive: true });
+
+      let tg = null;
+      try {
+        tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+        if (tg) {
+          tg.ready();
+          tg.expand();
+          applyTheme(tg.themeParams || {});
+          if (typeof tg.onEvent === "function") {
+            tg.onEvent("themeChanged", function () {
+              applyTheme(tg.themeParams || {});
+            });
+          }
+        }
+      } catch (_) {
+        tg = null;
+      }
+
+      let device;
+      try {
+        device = detectDevice();
+      } catch (_) {
+        device = { kind: "desktop", label: "Desktop" };
+      }
+      deviceLabelEl.textContent = device.label;
+
+      // Авторизация через Telegram Mini Apps
+      initAuth();
+
+      function applyTheme(theme) {
+        const root = document.documentElement.style;
+        if (theme.bg_color) root.setProperty("--bg", theme.bg_color);
+        if (theme.text_color) root.setProperty("--text", theme.text_color);
+        if (theme.hint_color) root.setProperty("--hint", theme.hint_color);
+        if (theme.button_color) root.setProperty("--button", theme.button_color);
+        if (theme.button_text_color) root.setProperty("--button-text", theme.button_text_color);
+        if (theme.secondary_bg_color) root.setProperty("--secondary", theme.secondary_bg_color);
+        if (tg && tg.setHeaderColor && theme.bg_color) {
+          try { tg.setHeaderColor(theme.bg_color); } catch (_) {}
+        }
+        if (tg && tg.setBackgroundColor && theme.bg_color) {
+          try { tg.setBackgroundColor(theme.bg_color); } catch (_) {}
+        }
+      }
+
+      function detectDevice() {
+        const platform = (tg && tg.platform ? String(tg.platform) : "").toLowerCase();
+        const ua = navigator.userAgent || "";
+
+        if (platform === "ios" || /iphone|ipad|ipod/i.test(ua)) {
+          return { kind: "ios", label: "iOS" };
+        }
+        if (platform === "android" || /android/i.test(ua)) {
+          return { kind: "android", label: "Android" };
+        }
+        if (
+          platform === "tdesktop" ||
+          platform === "web" ||
+          platform === "weba" ||
+          platform === "macos" ||
+          platform === "unigram" ||
+          /windows|macintosh|linux/i.test(ua)
+        ) {
+          return { kind: "desktop", label: desktopLabel(platform, ua) };
+        }
+        return { kind: "desktop", label: desktopLabel(platform, ua) };
+      }
+
+      function desktopLabel(platform, ua) {
+        // Prefer the Telegram platform label when available.
+        const map = {
+          tdesktop: "Desktop",
+          web: "Web",
+          weba: "Web",
+          macos: "macOS",
+          unigram: "Desktop",
+        };
+        if (platform && map[platform]) return map[platform];
+        // Otherwise detect the OS from the User-Agent.
+        if (/windows/i.test(ua)) return "Windows";
+        if (/macintosh|mac os x/i.test(ua)) return "macOS";
+        if (/linux/i.test(ua)) return "Linux";
+        if (/iphone|ipad|ipod/i.test(ua)) return "iOS";
+        if (/android/i.test(ua)) return "Android";
+        return "Desktop";
+      }
+
+      function setStatus(text, kind) {
+        statusEl.textContent = text || "";
+        statusEl.classList.remove("is-error", "is-ok");
+        if (kind === "error") statusEl.classList.add("is-error");
+        if (kind === "ok") statusEl.classList.add("is-ok");
+      }
+
+      function formatDate(iso) {
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return iso;
+        return date.toLocaleString("ru-RU", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+
+      // ------------------------------------------------------------------
+      // Авторизация
+      // ------------------------------------------------------------------
+
+      async function initAuth() {
+        try {
+          // Сначала пробуем сохранённый токен
+          const saved = localStorage.getItem(TOKEN_KEY);
+          if (saved) {
+            authToken = saved;
+            const ok = await checkToken();
+            if (ok) {
+              loadKeysStatus();
+              restoreExistingSubscription();
+              return;
+            }
+            authToken = null;
+            localStorage.removeItem(TOKEN_KEY);
+          }
+
+          // Нет токена или он невалиден — логинимся через initData
+          if (!tg || !tg.initData) {
+            setStatus("Доступ только через Telegram Mini Apps", "error");
+            subscribeBtn.disabled = true;
+            return;
+          }
+
+          const res = await fetch("/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ init_data: tg.initData }),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(function () { return {}; });
+            setStatus(err.detail || "Ошибка авторизации", "error");
+            subscribeBtn.disabled = true;
+            return;
+          }
+          const data = await res.json();
+          authToken = data.token;
+          localStorage.setItem(TOKEN_KEY, authToken);
+          loadKeysStatus();
+          restoreExistingSubscription();
+        } catch (err) {
+          setStatus("Ошибка авторизации", "error");
+          subscribeBtn.disabled = true;
+        }
+      }
+
+      async function checkToken() {
+        try {
+          const res = await fetch("/auth/me", {
+            headers: authHeaders(),
+          });
+          return res.ok;
+        } catch (_) {
+          return false;
+        }
+      }
+
+      function authHeaders(extra) {
+        const headers = extra || {};
+        if (authToken) headers["Authorization"] = "Bearer " + authToken;
+        return headers;
+      }
+
+      async function apiFetch(url, options) {
+        options = options || {};
+        options.headers = authHeaders(options.headers || {});
+        const res = await fetch(url, options);
+        if (res.status === 401 && authToken) {
+          // Сессия истекла — пробуем перелогиниться один раз
+          authToken = null;
+          localStorage.removeItem(TOKEN_KEY);
+          await initAuth();
+          if (!authToken) throw new Error("Не удалось авторизоваться");
+          options.headers = authHeaders(options.headers || {});
+          return fetch(url, options);
+        }
+        return res;
+      }
+
+      // ------------------------------------------------------------------
+      // Подписка
+      // ------------------------------------------------------------------
+
+      async function loadKeysStatus() {
+        try {
+          const res = await apiFetch("/keys/status");
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const data = await res.json();
+          if (!data.exists) {
+            keysUpdatedEl.textContent = "Ключи ещё не загружены";
+            return;
+          }
+          keysUpdatedEl.textContent = data.updated_at
+            ? formatDate(data.updated_at)
+            : "Неизвестно";
+        } catch (err) {
+          keysUpdatedEl.textContent = "Не удалось загрузить";
+          setStatus("Ошибка загрузки статуса ключей", "error");
+        }
+      }
+
+      function pickLink(status) {
+        if (!status) return null;
+        // Prefer the encrypted Happ link (happ://crypt5/...) — Happ accepts it directly.
+        // Fall back to the ngrok HTTPS URL only if no Happ deep link is available.
+        if (status.encrypted_link) return status.encrypted_link;
+        if (device.kind === "ios") return status.ios_deep_link || status.public_url || null;
+        if (device.kind === "android") return status.android_deep_link || status.public_url || null;
+        return status.public_url || null;
+      }
+
+      function markReady(link) {
+        subscriptionLink = link;
+        subscribeBtn.textContent = "Открыть подписку";
+        subscribeBtn.disabled = false;
+        setStatus("Подписка готова", "ok");
+      }
+
+      async function openLink(link) {
+        if (!link) return;
+        // In Telegram Mini Apps, custom URI schemes (happ://) don't work
+        // via window.location.href or tg.openLink(). Get a signed redirect
+        // URL and open it — the redirect page itself handles happ:// in the
+        // system browser (where the custom scheme is registered).
+        if (/^happ:\/\//i.test(link)) {
+          if (tg && typeof tg.openLink === "function") {
+            try {
+              const res = await apiFetch("/subscription-redirect-url");
+              if (res.ok) {
+                const url = await res.text();
+                tg.openLink(url.trim());
+                return;
+              }
+            } catch (_) {}
+            tg.openLink(window.location.origin + "/subscription-redirect");
+            return;
+          }
+          window.location.href = link;
+          return;
+        }
+        if (/^https?:\/\//i.test(link)) {
+          if (tg && typeof tg.openLink === "function") {
+            tg.openLink(link);
+            return;
+          }
+          window.open(link, "_blank");
+          return;
+        }
+        window.location.href = link;
+      }
+
+      async function fetchStatus() {
+        const res = await apiFetch("/build-subscription/status");
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      }
+
+      async function restoreExistingSubscription() {
+        // Links are generated on demand from the database.
+      }
+
+      async function waitForLink() {
+        const started = Date.now();
+        while (Date.now() - started < LINK_TIMEOUT_MS) {
+          const status = await fetchStatus();
+          const link = pickLink(status);
+          if (link) return { status, link };
+
+          if (!status.running && status.returncode != null && status.returncode !== 0) {
+            throw new Error("Сборка подписки завершилась с ошибкой");
+          }
+
+          const elapsed = Math.round((Date.now() - started) / 1000);
+          setStatus("Ждём ссылку… " + elapsed + " с");
+          await sleep(POLL_MS);
+        }
+        throw new Error("Таймаут ожидания ссылки подписки");
+      }
+
+      async function createSubscription() {
+        setStatus("Создаём подписку…");
+        const res = await apiFetch("/build-subscription", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ active_minutes: ACTIVE_MINUTES }),
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const initial = await res.json();
+        const ready = pickLink(initial);
+        if (ready) return ready;
+
+        setStatus("Поднимаем туннель…");
+        const { link } = await waitForLink();
+        return link;
+      }
+
+      async function onSubscribeClick() {
+        if (creating) return;
+
+        if (subscriptionLink) {
+          openLink(subscriptionLink);
+          return;
+        }
+
+        creating = true;
+        subscribeBtn.disabled = true;
+        try {
+          const existing = await fetchStatus();
+          const existingLink = pickLink(existing);
+          if (existing.running && existingLink) {
+            markReady(existingLink);
+            openLink(existingLink);
+            return;
+          }
+
+          const link = await createSubscription();
+          markReady(link);
+          openLink(link);
+        } catch (err) {
+          subscriptionLink = null;
+          subscribeBtn.textContent = "Создать подписку";
+          subscribeBtn.disabled = false;
+          setStatus(err && err.message ? err.message : "Не удалось создать подписку", "error");
+        } finally {
+          creating = false;
+        }
+      }
+
+      function sleep(ms) {
+        return new Promise(function (resolve) {
+          setTimeout(resolve, ms);
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
