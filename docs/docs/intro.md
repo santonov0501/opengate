@@ -1,0 +1,92 @@
+---
+sidebar_position: 1
+title: Введение
+description: Введение в OpenGate — систему управления подписками Happ
+---
+
+# Введение
+
+**OpenGate** — это бэкенд для управления подписками **Happ** (VPN-приложение для Android и iOS). Сервис предоставляет Telegram Mini App, через которое пользователи могут создавать и добавлять подписки в Happ.
+
+## Основные возможности
+
+- 🔐 **Telegram Mini App** — вход через Telegram WebApp с проверкой HMAC-подписи
+- 🔑 **Управление ключами** — автоматическое обновление списка серверов (pull_keys) каждые 30 минут
+- 📦 **Генерация подписок** — создание файлов `subscription.txt` и `subscription.json`
+- 🔗 **Happ deep links** — генерация зашифрованных `happ://` ссылок через crypto API
+- ⚡ **Кэширование** — in-memory кэш зашифрованных ссылок (5 минут)
+- 🛡️ **Rate limiting** — защита от brute-force атак на авторизацию
+
+## Технологический стек
+
+| Компонент | Технология |
+|-----------|------------|
+| Backend | Python 3.11 + FastAPI |
+| Сервер | Uvicorn |
+| База данных | SQLite (`data/app.db`) |
+| Хранилище ключей | JSON (`data/keys.json`) |
+| Деплой | Railway (Docker) |
+| Фронтенд | HTML + Vanilla JS (Telegram Mini App) |
+
+## Структура проекта
+
+```
+opengate/
+├── app/
+│   ├── __init__.py
+│   ├── main.py          # FastAPI приложение (вся логика)
+│   ├── storage.py       # Работа с SQLite и JSON
+│   └── static/
+│       └── index.html   # Telegram Mini App фронтенд
+├── scripts/
+│   ├── build_subscription.py  # Шифрование ссылок через crypto API
+│   └── pull_keys.py           # Обновление ключей
+├── data/
+│   ├── app.db           # SQLite база данных
+│   └── keys.json        # Ключи серверов
+├── docs/                # Документация (Docusaurus)
+├── Dockerfile
+├── railway.json
+└── requirements.txt
+```
+
+## Быстрый старт
+
+### Локальный запуск
+
+```bash
+# Установка зависимостей
+pip install -r requirements.txt
+
+# Настройка переменных окружения (см. ниже)
+export TELEGRAM_BOT_TOKEN="ваш_токен"
+export PUBLIC_BASE_URL="http://127.0.0.1:8080"
+
+# Запуск
+uvicorn app.main:app --host 0.0.0.0 --port 8080
+```
+
+### Переменные окружения
+
+| Переменная | Обязательная | Описание |
+|------------|-------------|----------|
+| `TELEGRAM_BOT_TOKEN` | ✅ | Токен Telegram бота для Mini App |
+| `PUBLIC_BASE_URL` | ✅ | Публичный URL сервиса (для подписанных ссылок) |
+| `TELEGRAM_ALLOWED_IDS` | ❌ | Список разрешённых Telegram ID (через запятую) |
+| `SESSION_TTL_HOURS` | ❌ | Время жизни сессии (по умолчанию 24ч) |
+| `SUBSCRIPTION_LINK_TTL_SECONDS` | ❌ | TTL подписанных ссылок (по умолчанию 86400) |
+| `SIGNING_KEY_HEX` | ❌ | Ключ подписи URL (hex). Если не задан — генерируется при старте |
+| `PROVIDER_ID` | ❌ | ID провайдера для Happ |
+| `LOGIN_RATE_LIMIT` | ❌ | Max попыток входа за окно (по умолчанию 10) |
+| `LOGIN_RATE_WINDOW_SECONDS` | ❌ | Окно rate limiting (по умолчанию 60) |
+| `ENCRYPTED_LINK_CACHE_TTL_SECONDS` | ❌ | TTL кэша ссылок (по умолчанию 300) |
+| `CRYPTO_API_CONCURRENCY` | ❌ | Параллельность crypto API (по умолчанию 5) |
+
+:::warning Важно
+`SIGNING_KEY_HEX` должен быть **постоянным** на проде. Если его не задать, ключ генерируется заново при каждом рестарте, и все подписанные ссылки перестанут работать.
+:::
+
+## Дальнейшее чтение
+
+- [Архитектура](/architecture) — подробное описание внутреннего устройства
+- [API Документация](/api) — все эндпоинты и примеры
