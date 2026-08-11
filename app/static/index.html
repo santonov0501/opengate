@@ -422,18 +422,15 @@
 
       async function openLink(link) {
         if (!link) return;
-        // For happ:// links, navigate current page to redirect URL
-        // This ensures the redirect happens in the current tab
+        // For happ:// links, use tg.openLink() to open in Happ app
+        // This is the only way to open custom protocols in Telegram Mini Apps
         if (/^happ:\/\//i.test(link)) {
-          try {
-            const res = await apiFetch("/subscription-redirect-url");
-            if (res.ok) {
-              const url = await res.text();
-              window.location.href = url.trim();
-              return;
-            }
-          } catch (_) {}
-          window.location.href = window.location.origin + "/subscription-redirect";
+          if (tg && typeof tg.openLink === "function") {
+            tg.openLink(link);
+            return;
+          }
+          // Fallback for non-Telegram environment
+          window.location.href = link;
           return;
         }
         if (/^https?:\/\//i.test(link)) {
