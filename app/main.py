@@ -94,7 +94,6 @@ class ManagedScriptStatus(BaseModel):
 class BuildSubscriptionRequest(BaseModel):
     active_minutes: int = Field(default=5, ge=1, le=60)
     port: int = Field(default=8000, ge=1, le=65535)
-    ngrok_api_port: int = Field(default=4040, ge=1, le=65535)
     name: str | None = None
     slug: str | None = None
     profile_title: str | None = None
@@ -606,11 +605,8 @@ async def start_build_subscription(request: BuildSubscriptionRequest) -> Managed
             "-u",
             str(SCRIPTS_DIR / "build_subscription.py"),
             "--serve",
-            "--https",
             "--port",
             str(request.port),
-            "--ngrok-api-port",
-            str(request.ngrok_api_port),
         ]
         if request.name:
             command.extend(["--name", request.name])

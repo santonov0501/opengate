@@ -188,9 +188,6 @@
 
   <script>
     (function () {
-      const POLL_MS = 1800;
-      const LINK_TIMEOUT_MS = 120000;
-      const ACTIVE_MINUTES = 5;
       const TOKEN_KEY = "happ_sub_token";
 
       const keysUpdatedEl = document.getElementById("keys-updated");
@@ -416,16 +413,6 @@
         }
       }
 
-      function pickLink(status) {
-        if (!status) return null;
-        // Prefer the encrypted Happ link (happ://crypt5/...) — Happ accepts it directly.
-        // Fall back to the ngrok HTTPS URL only if no Happ deep link is available.
-        if (status.encrypted_link) return status.encrypted_link;
-        if (device.kind === "ios") return status.ios_deep_link || status.public_url || null;
-        if (device.kind === "android") return status.android_deep_link || status.public_url || null;
-        return status.public_url || null;
-      }
-
       function markReady(link) {
         subscriptionLink = link;
         subscribeBtn.textContent = "Открыть подписку";
@@ -466,49 +453,16 @@
         window.location.href = link;
       }
 
-      async function fetchStatus() {
-        const res = await apiFetch("/build-subscription/status");
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        return res.json();
-      }
-
       async function restoreExistingSubscription() {
         // Links are generated on demand from the database.
       }
 
-      async function waitForLink() {
-        const started = Date.now();
-        while (Date.now() - started < LINK_TIMEOUT_MS) {
-          const status = await fetchStatus();
-          const link = pickLink(status);
-          if (link) return { status, link };
-
-          if (!status.running && status.returncode != null && status.returncode !== 0) {
-            throw new Error("Сборка подписки завершилась с ошибкой");
-          }
-
-          const elapsed = Math.round((Date.now() - started) / 1000);
-          setStatus("Ждём ссылку… " + elapsed + " с");
-          await sleep(POLL_MS);
-        }
-        throw new Error("Таймаут ожидания ссылки подписки");
-      }
-
       async function createSubscription() {
-        setStatus("Создаём подписку…");
-        const res = await apiFetch("/build-subscription", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ active_minutes: ACTIVE_MINUTES }),
-        });
+        setStatus("Получаем ссылку подписки…");
+        const res = await apiFetch("/subscription-link");
         if (!res.ok) throw new Error("HTTP " + res.status);
-        const initial = await res.json();
-        const ready = pickLink(initial);
-        if (ready) return ready;
-
-        setStatus("Поднимаем туннель…");
-        const { link } = await waitForLink();
-        return link;
+        const link = await res.text();
+        return link.trim();
       }
 
       async function onSubscribeClick() {
@@ -522,14 +476,6 @@
         creating = true;
         subscribeBtn.disabled = true;
         try {
-          const existing = await fetchStatus();
-          const existingLink = pickLink(existing);
-          if (existing.running && existingLink) {
-            markReady(existingLink);
-            openLink(existingLink);
-            return;
-          }
-
           const link = await createSubscription();
           markReady(link);
           openLink(link);
@@ -543,11 +489,6 @@
         }
       }
 
-      function sleep(ms) {
-        return new Promise(function (resolve) {
-          setTimeout(resolve, ms);
-        });
-      }
     })();
   </script>
 </body>
