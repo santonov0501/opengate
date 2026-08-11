@@ -46,6 +46,20 @@ const config = {
     ],
   ],
 
+  webpack: {
+    configure: (webpackConfig, { isServer }) => {
+      if (!isServer) {
+        const ProgressPlugin = require('webpack').ProgressPlugin;
+        if (webpackConfig.plugins) {
+          webpackConfig.plugins = webpackConfig.plugins.filter(
+            (plugin) => !(plugin instanceof ProgressPlugin)
+          );
+        }
+      }
+      return webpackConfig;
+    },
+  },
+
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
