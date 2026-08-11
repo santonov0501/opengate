@@ -422,24 +422,26 @@
 
       async function openLink(link) {
         if (!link) return;
-        // In Telegram Mini Apps, custom URI schemes (happ://) don't work
-        // via window.location.href or tg.openLink(). Get a signed redirect
-        // URL and open it — the redirect page itself handles happ:// in the
-        // system browser (where the custom scheme is registered).
+        // Try to open happ:// links directly in Telegram Mini Apps.
+        // This shows the system prompt "Open in Happ?" directly without
+        // an intermediate redirect page.
         if (/^happ:\/\//i.test(link)) {
           if (tg && typeof tg.openLink === "function") {
             try {
-              const res = await apiFetch("/subscription-redirect-url");
-              if (res.ok) {
-                const url = await res.text();
-                tg.openLink(url.trim());
-                return;
-              }
+              tg.openLink(link);
+              return;
             } catch (_) {}
-            tg.openLink(window.location.origin + "/subscription-redirect");
-            return;
           }
-          window.location.href = link;
+          // Fallback: use redirect page if direct open fails
+          try {
+            const res = await apiFetch("/subscription-redirect-url");
+            if (res.ok) {
+              const url = await res.text();
+              tg.openLink(url.trim());
+              return;
+            }
+          } catch (_) {}
+          tg.openLink(window.location.origin + "/subscription-redirect");
           return;
         }
         if (/^https?:\/\//i.test(link)) {
