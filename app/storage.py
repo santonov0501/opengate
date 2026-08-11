@@ -388,6 +388,9 @@ def subscription_headers(user_id: int) -> dict[str, str]:
 
     headers = {
         "profile-title": f"{title} {user_id}"[:25],
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
     }
     headers.update({str(k): str(v) for k, v in settings.items()})
     return headers
