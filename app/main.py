@@ -37,6 +37,8 @@ DATA_DIR = PROJECT_DIR / "data"
 STATIC_DIR = BASE_DIR / "static"
 PYTHON = sys.executable
 MAX_LOG_LINES = 300
+PULL_KEYS_TIMEOUT = 120  # seconds
+SUBSCRIPTION_EXPIRY_CHECK_INTERVAL = 30  # seconds
 
 load_dotenv(PROJECT_DIR / ".env")
 
@@ -462,7 +464,7 @@ async def run_pull_keys_once() -> CommandResult:
     async with pull_lock:
         result = await run_command(
             [PYTHON, str(SCRIPTS_DIR / "pull_keys.py"), "--once"],
-            timeout=120,
+            timeout=PULL_KEYS_TIMEOUT,
         )
         # If pull succeeded and PUBLIC_BASE_URL is configured, pre-encrypt links
         if result.returncode == 0 and PUBLIC_BASE_URL:
@@ -486,7 +488,7 @@ async def pull_keys_scheduler() -> None:
 
 async def subscription_expiry_watcher() -> None:
     while True:
-        await asyncio.sleep(5)
+        await asyncio.sleep(SUBSCRIPTION_EXPIRY_CHECK_INTERVAL)
         async with build_lock:
             if (
                 build_subscription_process.is_running()
