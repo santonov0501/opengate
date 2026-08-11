@@ -422,21 +422,35 @@
 
       async function openLink(link) {
         if (!link) return;
+        console.log("[openLink] Received link:", link);
+        
         // For happ:// links, use tg.openLink() to open in Happ app
         // This is the only way to open custom protocols in Telegram Mini Apps
-        if (/^happ:\/\//i.test(link)) {
+        if (/^happ:\\/\\//i.test(link)) {
+          console.log("[openLink] Opening happ:// link via tg.openLink()");
           if (tg && typeof tg.openLink === "function") {
-            tg.openLink(link);
+            try {
+              tg.openLink(link);
+              console.log("[openLink] tg.openLink() called successfully");
+            } catch (err) {
+              console.error("[openLink] tg.openLink() failed:", err);
+              window.location.href = link;
+            }
             return;
           }
           // Fallback for non-Telegram environment
+          console.warn("[openLink] tg.openLink not available, using window.location.href");
           window.location.href = link;
           return;
         }
-        if (/^https?:\/\//i.test(link)) {
+        
+        if (/^https?:\\/\\//i.test(link)) {
+          console.log("[openLink] Opening HTTPS link");
           window.location.href = link;
           return;
         }
+        
+        console.warn("[openLink] Unknown link type, attempting direct navigation");
         window.location.href = link;
       }
 
@@ -446,16 +460,24 @@
 
       async function createSubscription() {
         setStatus("Получаем ссылку подписки…");
+        console.log("[createSubscription] Fetching /subscription-link");
         const res = await apiFetch("/subscription-link");
-        if (!res.ok) throw new Error("HTTP " + res.status);
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error("[createSubscription] HTTP error:", res.status, errText);
+          throw new Error("HTTP " + res.status);
+        }
         const link = await res.text();
-        return link.trim();
+        const trimmed = link.trim();
+        console.log("[createSubscription] Received link:", trimmed);
+        return trimmed;
       }
 
       async function onSubscribeClick() {
         if (creating) return;
 
         if (subscriptionLink) {
+          console.log("[onSubscribeClick] Using cached subscription link");
           openLink(subscriptionLink);
           return;
         }
@@ -463,6 +485,7 @@
         creating = true;
         subscribeBtn.disabled = true;
         try {
+          console.log("[onSubscribeClick] Creating new subscription");
           const link = await createSubscription();
           markReady(link);
           openLink(link);
@@ -470,6 +493,7 @@
           subscriptionLink = null;
           subscribeBtn.textContent = "Создать подписку";
           subscribeBtn.disabled = false;
+          console.error("[onSubscribeClick] Error:", err);
           setStatus(err && err.message ? err.message : "Не удалось создать подписку", "error");
         } finally {
           creating = false;
@@ -480,3 +504,4 @@
   </script>
 </body>
 </html>
+
