@@ -422,16 +422,14 @@
 
       async function openLink(link) {
         if (!link) return;
-        // Try to open happ:// links directly in Telegram Mini Apps.
-        // This shows the system prompt "Open in Happ?" directly without
-        // an intermediate redirect page.
         if (/^happ:\/\//i.test(link)) {
-          if (tg && typeof tg.openLink === "function") {
-            try {
-              tg.openLink(link);
-              return;
-            } catch (_) {}
-          }
+          // Try to open the custom scheme directly from the webview.
+          // This shows the system prompt "Open in Happ?" directly on
+          // the main screen without an intermediate redirect page.
+          try {
+            window.location.href = link;
+            return;
+          } catch (_) {}
           // Fallback: use redirect page if direct open fails
           try {
             const res = await apiFetch("/subscription-redirect-url");
