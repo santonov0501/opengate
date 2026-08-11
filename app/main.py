@@ -805,29 +805,6 @@ def subscription_redirect_302(request: Request) -> RedirectResponse:
     return RedirectResponse(target, status_code=302)
 
 
-@app.get("/subscription-redirect", response_class=HTMLResponse)
-def subscription_redirect(request: Request) -> str:
-    """Редирект-страница (fallback), открывающая Happ deep link в системном браузере.
-
-    Доступна по подписанному URL (expires+sig) — системный браузер,
-    куда её открывает tg.openLink(), не имеет Bearer-токена.
-    """
-    user_id = verify_signed_redirect(request)
-    if user_id is None:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    target = _get_deep_link(request, user_id)
-    escaped_target = html.escape(target, quote=True)
-    return f"""<!doctype html>
-<html>
-<head><meta charset="utf-8"><title>Redirecting to Happ...</title>
-<meta http-equiv="refresh" content="0; url={escaped_target}">
-<style>body{{background:#1c1c1e;color:#fff;font-family:system-ui;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}}p{{text-align:center}}</style>
-</head>
-<body><p>Redirecting to Happ…</p>
-<script>window.location.href="{escaped_target}";</script></body>
-</html>"""
-
-
 @app.get("/subscription-redirect-url", response_class=PlainTextResponse)
 def subscription_redirect_url(
     request: Request,
@@ -841,70 +818,6 @@ def subscription_redirect_url(
     return make_signed_redirect_url(request, user["id"])
 
 
-@app.get("/subscription-page", response_class=HTMLResponse)
-def subscription_page(user: dict = Depends(get_current_user)) -> str:
-    return """
-<!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="refresh" content="300">
-  <title>Happ subscription</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 32px; max-width: 920px; }
-    pre { white-space: pre-wrap; background: #f5f5f5; padding: 16px; border-radius: 6px; }
-    a { overflow-wrap: anywhere; }
-  </style>
-</head>
-<body>
-  <h1>Happ subscription tunnel</h1>
-  <p id="state">Starting tunnel...</p>
-  <p><strong>Subscription:</strong> <a id="url" href=""></a></p>
-  <p><strong>Add in Happ:</strong> <a id="deep" href=""></a></p>
-  <pre id="logs"></pre>
-  <script>
-    const TOKEN_KEY = 'happ_sub_token';
-    function authHeaders(extra) {
-      const headers = extra || {};
-      const token = localStorage.getItem(TOKEN_KEY);
-      if (token) headers['Authorization'] = 'Bearer ' + token;
-      return headers;
-    }
-    async function refresh() {
-      const start = await fetch('/build-subscription', {
-        method: 'POST',
-        headers: authHeaders({'Content-Type': 'application/json'}),
-        body: JSON.stringify({active_minutes: 5})
-      });
-      const data = await start.json();
-      render(data);
-    }
-    function baseUrl() {
-      return window.location.origin + '/';
-    }
-    function render(data) {
-      document.getElementById('state').textContent = data.running ? 'Tunnel is active for 5 minutes' : 'Tunnel is not running';
-      const subUrl = baseUrl() + 'subscription.json';
-      const link = document.getElementById('url');
-      link.href = subUrl;
-      link.textContent = subUrl;
-      const deep = document.getElementById('deep');
-      const deepUrl = data.encrypted_link || 'happ://add/' + subUrl;
-      deep.href = deepUrl;
-      deep.textContent = deepUrl;
-      document.getElementById('logs').textContent = (data.logs || []).join('\\n');
-    }
-    refresh();
-    setInterval(async () => {
-      const response = await fetch('/build-subscription/status', {headers: authHeaders()});
-      const data = await response.json();
-      render(data);
-    }, 2000);
-  </script>
-</body>
-</html>
-"""
 
 
 @app.post("/happ-ping", response_model=CommandResult)
