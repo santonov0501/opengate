@@ -39,9 +39,11 @@ const config = {
           routeBasePath: '/',
         },
         blog: false,
-        theme: {
+      theme: {
           customCss: require.resolve('./src/css/custom.css'),
         },
+        scripts: [],
+        stylesheets: [],
       }),
     ],
   ],
