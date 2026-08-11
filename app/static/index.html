@@ -420,16 +420,34 @@
         setStatus("Подписка готова", "ok");
       }
 
+      function openCustomScheme(link) {
+        // 1) Create a temporary anchor and click it. This mimics a real
+        //    user gesture and triggers the system prompt "Open in Happ?"
+        //    directly from the webview on iOS & Android.
+        try {
+          const a = document.createElement("a");
+          a.href = link;
+          a.style.display = "none";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          return true;
+        } catch (_) {}
+        // 2) Fallback: direct location assignment.
+        try {
+          window.location.href = link;
+          return true;
+        } catch (_) {}
+        return false;
+      }
+
       async function openLink(link) {
         if (!link) return;
         if (/^happ:\/\//i.test(link)) {
           // Try to open the custom scheme directly from the webview.
           // This shows the system prompt "Open in Happ?" directly on
           // the main screen without an intermediate redirect page.
-          try {
-            window.location.href = link;
-            return;
-          } catch (_) {}
+          if (openCustomScheme(link)) return;
           // Fallback: use redirect page if direct open fails
           try {
             const res = await apiFetch("/subscription-redirect-url");
