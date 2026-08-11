@@ -23,7 +23,7 @@ from typing import Literal
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -384,7 +384,7 @@ def require_file_access(request: Request, filename: str, user: dict | None = Non
 
 
 def make_signed_redirect_url(request: Request, user_id: int) -> str:
-    """Создаёт подписанный URL на /subscription-redirect.
+    """Создаёт подписанный URL на /subscription-redirect-302.
 
     Фронт открывает этот URL через tg.openLink() в системном браузере,
     где нет доступа к Bearer-токену. Подпись и есть авторизация.
@@ -395,7 +395,7 @@ def make_signed_redirect_url(request: Request, user_id: int) -> str:
     sig = hmac.new(SIGNING_KEY, payload.encode(), hashlib.sha256).hexdigest()
     # Use PUBLIC_BASE_URL if configured to ensure HTTPS scheme
     base_url = PUBLIC_BASE_URL if PUBLIC_BASE_URL else str(request.base_url)
-    return f"{base_url}subscription-redirect?expires={expires}&uid={user_id}&sig={sig}"
+    return f"{base_url}subscription-redirect-302?expires={expires}&uid={user_id}&sig={sig}"
 
 
 def verify_signed_redirect(request: Request) -> int | None:
@@ -790,9 +790,24 @@ def subscription_link(request: Request, user: dict = Depends(get_current_user)) 
     return _get_deep_link(request, user["id"])
 
 
+@app.get("/subscription-redirect-302")
+def subscription_redirect_302(request: Request) -> RedirectResponse:
+    """Мгновенный 302-редирект на Happ deep link.
+
+    Открывается через tg.openLink() в системном браузере. Сервер сразу
+    возвращает 302 на happ:// — браузер следует за редиректом и показывает
+    системный промпт "Открыть в Happ?" без промежуточной HTML-страницы.
+    """
+    user_id = verify_signed_redirect(request)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    target = _get_deep_link(request, user_id)
+    return RedirectResponse(target, status_code=302)
+
+
 @app.get("/subscription-redirect", response_class=HTMLResponse)
 def subscription_redirect(request: Request) -> str:
-    """Редирект-страница, открывающая Happ deep link в системном браузере.
+    """Редирект-страница (fallback), открывающая Happ deep link в системном браузере.
 
     Доступна по подписанному URL (expires+sig) — системный браузер,
     куда её открывает tg.openLink(), не имеет Bearer-токена.
