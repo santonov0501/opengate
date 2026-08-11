@@ -78,6 +78,29 @@ LOGIN_RATE_WINDOW = int(os.getenv("LOGIN_RATE_WINDOW_SECONDS", "60"))  # per win
 login_attempts: dict[str, deque[float]] = defaultdict(deque)
 login_attempts_lock = threading.Lock()
 
+# Кэш encrypted links: user_id -> (encrypted_link, expires_at)
+ENCRYPTED_LINK_CACHE_TTL = int(os.getenv("ENCRYPTED_LINK_CACHE_TTL_SECONDS", "300"))  # 5 min
+encrypted_link_cache: dict[int, tuple[str, int]] = {}
+encrypted_link_cache_lock = threading.Lock()
+
+
+def get_cached_encrypted_link(user_id: int) -> str | None:
+    """Возвращает закэшированную encrypted link, если она не истекла."""
+    with encrypted_link_cache_lock:
+        cached = encrypted_link_cache.get(user_id)
+        if cached:
+            link, expires_at = cached
+            if expires_at > int(time.time()):
+                return link
+            del encrypted_link_cache[user_id]
+    return None
+
+
+def set_cached_encrypted_link(user_id: int, link: str, expires_at: int) -> None:
+    """Сохраняет encrypted link в кэше с TTL."""
+    with encrypted_link_cache_lock:
+        encrypted_link_cache[user_id] = (link, expires_at)
+
 
 def check_login_rate_limit(ip: str) -> None:
     """Проверяет лимит попыток входа для IP-адреса.
@@ -744,8 +767,12 @@ def _get_deep_link(request: Request, user_id: int) -> str:
     файл по защищённой ссылке, а не через незащищённый ngrok-туннель.
     user_id зашит в подпись, чтобы подписка пришла с OpenGate <user_id>.
     """
-    # Use the plain-text subscription for Happ to ensure servers are delivered
-    # If we have a precomputed encrypted link in DB and it's not expired, return it
+    # 1) Check in-memory cache first (fastest)
+    cached = get_cached_encrypted_link(user_id)
+    if cached:
+        return cached
+
+    # 2) Check DB for precomputed encrypted link
     try:
         row = storage.get_encrypted_link(user_id)
         if row and row.get("encrypted_link"):
@@ -754,11 +781,14 @@ def _get_deep_link(request: Request, user_id: int) -> str:
             except Exception:
                 expires = 0
             if expires and expires > int(time.time()):
+                # Cache in memory with a shorter TTL than the link expiry
+                cache_expires = min(expires, int(time.time()) + ENCRYPTED_LINK_CACHE_TTL)
+                set_cached_encrypted_link(user_id, row["encrypted_link"], cache_expires)
                 return row["encrypted_link"]
     except Exception:
         pass
 
-    # Fallback: sign the plain-text subscription URL and try to encrypt on the fly
+    # 3) Fallback: sign the plain-text subscription URL and try to encrypt on the fly
     target_url = make_signed_subscription_url(request, "subscription.txt", user_id)
     try:
         response = call_crypto_api(target_url)
@@ -767,6 +797,9 @@ def _get_deep_link(request: Request, user_id: int) -> str:
             data = json.loads(encrypted)
             encrypted = (data.get("encrypted_link") or "").strip()
         if encrypted.startswith("happ://"):
+            # Cache the freshly encrypted link
+            cache_expires = int(time.time()) + ENCRYPTED_LINK_CACHE_TTL
+            set_cached_encrypted_link(user_id, encrypted, cache_expires)
             return encrypted
     except Exception:
         pass
@@ -777,18 +810,6 @@ def _get_deep_link(request: Request, user_id: int) -> str:
 @app.get("/subscription-link", response_class=PlainTextResponse)
 def subscription_link(request: Request, user: dict = Depends(get_current_user)) -> str:
     """Возвращает рабочую Happ deep link для текущего пользователя."""
-    # Try to return precomputed encrypted link if available and not expired
-    try:
-        row = storage.get_encrypted_link(user["id"])
-        if row and row.get("encrypted_link"):
-            try:
-                expires = int(row.get("expires_at") or "0")
-            except Exception:
-                expires = 0
-            if expires and expires > int(time.time()):
-                return row["encrypted_link"]
-    except Exception:
-        pass
     return _get_deep_link(request, user["id"])
 
 
