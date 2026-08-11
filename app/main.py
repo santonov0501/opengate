@@ -860,32 +860,6 @@ def subscription_redirect_url(
 
 
 
-@app.post("/happ-ping", response_model=CommandResult)
-async def happ_ping(
-    region: str = "all",
-    limit: int = Query(default=20, ge=1, le=500),
-    timeout: float = Query(default=3.0, ge=0.1, le=30.0),
-    mode: Literal["tcp", "icmp", "via"] = "tcp",
-    via_method: Literal["get", "head", "tls"] = "get",
-    user: dict = Depends(get_current_user),
-) -> CommandResult:
-    command = [
-        PYTHON,
-        str(SCRIPTS_DIR / "happ_ping.py"),
-        "--region",
-        region,
-        "--limit",
-        str(limit),
-        "--timeout",
-        str(timeout),
-        "--mode",
-        mode,
-        "--via-method",
-        via_method,
-    ]
-    return await run_command(command, timeout=max(60, limit * (timeout + 1)))
-
-
 if __name__ == "__main__":
     import uvicorn
 
