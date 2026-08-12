@@ -1,11 +1,32 @@
 .features {
-  display: flex;
-  align-items: center;
   padding: 2rem 0;
   width: 100%;
 }
 
-.featureSvg {
-  height: 200px;
-  width: 200px;
+.feature {
+  margin-bottom: 1rem;
+}
+
+.featureLink {
+  display: block;
+  padding: 1rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 8px;
+  text-decoration: none;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.featureLink:hover {
+  border-color: var(--ifm-color-primary);
+  background-color: var(--ifm-color-emphasis-100);
+}
+
+.featureLink h3 {
+  margin: 0 0 0.5rem 0;
+  color: var(--ifm-color-primary);
+}
+
+.featureLink p {
+  margin: 0;
+  color: var(--ifm-color-emphasis-600);
 }

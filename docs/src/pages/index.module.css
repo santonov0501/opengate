@@ -4,20 +4,19 @@
  */
 
 .heroBanner {
-  padding: 4rem 0;
+  padding: 2rem 0;
   text-align: center;
-  position: relative;
-  overflow: hidden;
 }
 
-@media screen and (max-width: 996px) {
-  .heroBanner {
-    padding: 2rem;
-  }
+.title {
+  font-size: 2.5rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--ifm-color-primary);
 }
 
-.buttons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.subtitle {
+  font-size: 1.2rem;
+  color: var(--ifm-color-emphasis-600);
+  margin: 0;
 }

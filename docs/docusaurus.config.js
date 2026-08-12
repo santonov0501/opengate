@@ -90,28 +90,10 @@ const config = {
             label: 'Документация',
           },
         ],
+        hideOnScroll: true,
       },
       footer: {
-        style: 'dark',
-        links: [
-          {
-            title: 'Docs',
-            items: [
-              {
-                label: 'Введение',
-                to: '/docs/intro',
-              },
-              {
-                label: 'Архитектура',
-                to: '/docs/architecture/arch',
-              },
-              {
-                label: 'API Документация',
-                to: '/docs/api-spec/api-reference',
-              },
-            ],
-          },
-        ],
+        style: 'light',
         copyright: `© ${new Date().getFullYear()} OpenGate`,
       },
       prism: {
