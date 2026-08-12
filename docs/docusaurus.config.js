@@ -1,29 +1,45 @@
 // @ts-check
-// Note: type annotations allow type checking and IDE autocompletion
+// `@type` JSDoc annotations allow editor autocompletion and type checking
+// (when paired with `@ts-check`).
+// There are various equivalent ways to declare your Docusaurus config.
+// See: https://docusaurus.io/docs/api/docusaurus-config
 
-const lightCodeTheme = require('prism-react-renderer').themes.github;
-const darkCodeTheme = require('prism-react-renderer').themes.dracula;
+import {themes as prismThemes} from 'prism-react-renderer';
+
+// This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'OpenGate',
-  tagline: 'Happ subscription management backend',
+  tagline: 'Система управления подписками Happ',
   favicon: 'img/favicon.ico',
+
+  // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
+  future: {
+    v4: true, // Improve compatibility with the upcoming Docusaurus v4
+  },
 
   // Set the production url of your site here
   url: 'https://santonov0501.github.io',
   // Set the /<baseUrl>/ pathname under which your site is served
+  // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: '/opengate/',
 
-  // GitHub pages deployment config
-  organizationName: 'santonov0501',
-  projectName: 'opengate',
-
-  onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
+  // GitHub pages deployment config.
+  // If you aren't using GitHub pages, you don't need these.
+  organizationName: 'santonov0501', // Usually your GitHub org/user name.
+  projectName: 'opengate', // Usually your repo name.
+  onBrokenLinks: 'warn',
+  markdown: {
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+    },
+  },
+  trailingSlash: false,
 
   // Even if you don't use internationalization, you can use this field to set
-  // useful metadata like html lang.
+  // useful metadata like html lang. For example, if your site is Chinese, you
+  // may want to replace "en" with "zh-Hans".
   i18n: {
     defaultLocale: 'ru',
     locales: ['ru'],
@@ -35,49 +51,43 @@ const config = {
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: {
-          sidebarPath: require.resolve('./sidebars.js'),
-          routeBasePath: '/',
+          sidebarPath: './sidebars.js',
+          remarkPlugins: [
+            [require('@akebifiky/remark-simple-plantuml'), {}],
+          ],
         },
         blog: false,
         theme: {
-          customCss: require.resolve('./src/css/custom.css'),
+          customCss: './src/css/custom.css',
         },
       }),
     ],
   ],
 
-  webpack: {
-    configure: (webpackConfig, { isServer }) => {
-      if (!isServer) {
-        const ProgressPlugin = require('webpack').ProgressPlugin;
-        if (webpackConfig.plugins) {
-          webpackConfig.plugins = webpackConfig.plugins.filter(
-            (plugin) => !(plugin instanceof ProgressPlugin)
-          );
-        }
-      }
-      return webpackConfig;
-    },
-  },
+  plugins: [
+    'docusaurus-plugin-drawio',
+  ],
 
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       // Replace with your project's social card
       image: 'img/docusaurus-social-card.jpg',
+      colorMode: {
+        respectPrefersColorScheme: true,
+      },
       navbar: {
         title: 'OpenGate',
+        logo: {
+          alt: 'OpenGate Logo',
+          src: 'img/logo.svg',
+        },
         items: [
           {
-            type: 'docSidebar',
-            sidebarId: 'tutorialSidebar',
+            type: 'doc',
+            docId: 'intro',
             position: 'left',
             label: 'Документация',
-          },
-          {
-            href: 'https://github.com/santonov0501/opengate',
-            label: 'GitHub',
-            position: 'right',
           },
         ],
       },
@@ -85,39 +95,30 @@ const config = {
         style: 'dark',
         links: [
           {
-            title: 'Документация',
+            title: 'Docs',
             items: [
               {
                 label: 'Введение',
-                to: '/',
+                to: '/docs/intro',
               },
               {
                 label: 'Архитектура',
-                to: '/architecture',
+                to: '/docs/architecture/arch',
               },
               {
-                label: 'API',
-                to: '/api',
-              },
-            ],
-          },
-          {
-            title: 'Ресурсы',
-            items: [
-              {
-                label: 'GitHub',
-                href: 'https://github.com/santonov0501/opengate',
+                label: 'API Документация',
+                to: '/docs/api-spec/api-reference',
               },
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} OpenGate. Built with Docusaurus.`,
+        copyright: `© ${new Date().getFullYear()} OpenGate`,
       },
       prism: {
-        theme: lightCodeTheme,
-        darkTheme: darkCodeTheme,
+        theme: prismThemes.github,
+        darkTheme: prismThemes.dracula,
       },
     }),
 };
 
-module.exports = config;
+export default config;

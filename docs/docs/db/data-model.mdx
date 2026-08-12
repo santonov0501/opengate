@@ -1,0 +1,107 @@
+---
+sidebar_position: 3
+title: Модели данных
+description: Модели данных OpenGate — структура базы данных
+---
+
+# Модели данных
+
+## Схема SQLite
+
+```sql
+-- Пользователи
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY,
+    first_name TEXT,
+    last_name TEXT,
+    username TEXT,
+    photo_url TEXT,
+    access_status TEXT DEFAULT 'active',
+    subscription_id TEXT DEFAULT 'default',
+    created_at TEXT,
+    updated_at TEXT,
+    last_login_at TEXT
+);
+
+-- Подписки
+CREATE TABLE subscriptions (
+    id TEXT PRIMARY KEY,
+    status TEXT DEFAULT 'active',
+    title TEXT DEFAULT 'OpenGate',
+    settings_json TEXT DEFAULT '{}',
+    created_at TEXT,
+    updated_at TEXT
+);
+
+-- Ключи (история)
+CREATE TABLE key_updates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_url TEXT,
+    pulled_at TEXT,
+    raw_updated_at TEXT,
+    total_keys INTEGER,
+    status TEXT,
+    error TEXT
+);
+
+-- Зашифрованные ссылки
+CREATE TABLE encrypted_links (
+    user_id INTEGER PRIMARY KEY,
+    encrypted_link TEXT,
+    expires_at TEXT,
+    updated_at TEXT
+);
+```
+
+## Описание таблиц
+
+### users
+Хранит информацию о пользователях Telegram Mini App.
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| id | INTEGER | Уникальный ID пользователя (Telegram ID) |
+| first_name | TEXT | Имя пользователя |
+| last_name | TEXT | Фамилия пользователя |
+| username | TEXT | Telegram username |
+| photo_url | TEXT | URL аватара пользователя |
+| access_status | TEXT | Статус доступа (active/blocked) |
+| subscription_id | TEXT | ID подписки пользователя |
+| created_at | TEXT | Дата создания записи |
+| updated_at | TEXT | Дата последнего обновления |
+| last_login_at | TEXT | Дата последнего входа |
+
+### subscriptions
+Хранит информацию о подписках пользователей.
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| id | TEXT | Уникальный ID подписки |
+| status | TEXT | Статус подписки (active/inactive) |
+| title | TEXT | Название подписки |
+| settings_json | TEXT | Настройки подписки в формате JSON |
+| created_at | TEXT | Дата создания подписки |
+| updated_at | TEXT | Дата последнего обновления |
+
+### key_updates
+История обновлений ключей серверов.
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| id | INTEGER | Уникальный ID записи |
+| source_url | TEXT | URL источника ключей |
+| pulled_at | TEXT | Дата скачивания ключей |
+| raw_updated_at | TEXT | Дата обновления на источнике |
+| total_keys | INTEGER | Общее количество ключей |
+| status | TEXT | Статус обновления (success/error) |
+| error | TEXT | Текст ошибки (если есть) |
+
+### encrypted_links
+Кэш зашифрованных ссылок для пользователей.
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| user_id | INTEGER | ID пользователя (primary key) |
+| encrypted_link | TEXT | Зашифрованная ссылка |
+| expires_at | TEXT | Дата истечения ссылки |
+| updated_at | TEXT | Дата последнего обновления |
