@@ -14,38 +14,6 @@ OpenGate — это монолитное FastAPI-приложение, разв�
 2. **Telegram Mini App** — фронтенд, работающий внутри Telegram
 3. **Внешние сервисы** — Happ crypto API, Telegram API
 
-## Диаграмма потока данных
-
-```mermaid
-flowchart TB
-    subgraph Telegram
-        User[Пользователь]
-        MiniApp[Mini App WebView]
-    end
-
-    subgraph Backend[OpenGate Backend]
-        Auth[Авторизация<br/>HMAC + Sessions]
-        Keys[Управление ключами<br/>pull_keys]
-        Sub[Генерация подписок]
-        Cache[Кэш ссылок<br/>in-memory]
-        RateLimit[Rate Limiting]
-    end
-
-    subgraph External[Внешние сервисы]
-        CryptoAPI[Happ Crypto API]
-        TelegramAPI[Telegram API]
-    end
-
-    User --> MiniApp
-    MiniApp -->|initData| Auth
-    Auth -->|Bearer token| Sub
-    Sub -->|happ:// link| MiniApp
-    Sub -->|POST /api-v2.php| CryptoAPI
-    Keys -->|каждые 30 мин| TelegramAPI
-    Cache --> Sub
-    RateLimit --> Auth
-```
-
 ## Диаграмма последовательности авторизации
 
 ```plantuml
