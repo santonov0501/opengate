@@ -514,7 +514,7 @@
             <div class="icon-box">
               <svg viewBox="0 0 24 24"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm0-2a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm1-8h4v2h-6V7h2v5z"/></svg>
             </div>
-            <span class="label">Ключи обновлены</span>
+            <span class="label">Подписка обновлена</span>
           </div>
           <span class="value" id="keys-updated">Загрузка…</span>
         </div>
@@ -910,7 +910,7 @@
           }
 
           if (!data.exists) {
-            keysUpdatedEl.textContent = "Ключи ещё не загружены";
+            keysUpdatedEl.textContent = "Ещё не обновлялась";
             return;
           }
           keysUpdatedEl.textContent = data.updated_at
