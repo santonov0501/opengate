@@ -539,6 +539,10 @@
     <!-- FAQ Accordion -->
     <div class="card-group">
       <span class="section-title">Как подключить</span>
+      <a href="https://happ.su/" target="_blank" rel="noopener" class="btn-secondary" id="download-happ-btn" style="text-decoration: none; margin-bottom: 2px;">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+        <span>Скачать Happ</span>
+      </a>
       <details class="faq-item">
         <summary>Инструкция по настройке в 3 шага</summary>
         <div class="faq-content">
@@ -634,6 +638,36 @@
         device = { kind: "desktop", label: "Desktop" };
       }
       deviceLabelEl.textContent = device.label;
+
+      const DOWNLOAD_URLS = {
+        ios: "https://apps.apple.com/app/happ-proxy-utility/id6504287316",
+        android: "https://play.google.com/store/apps/details?id=com.happproxy",
+        desktop: "https://happ.su/"
+      };
+
+      const downloadHappBtn = document.getElementById("download-happ-btn");
+      if (downloadHappBtn) {
+        const targetUrl = DOWNLOAD_URLS[device.kind] || DOWNLOAD_URLS.desktop;
+        downloadHappBtn.href = targetUrl;
+
+        const btnTextEl = downloadHappBtn.querySelector("span");
+        if (btnTextEl) {
+          if (device.kind === "ios") {
+            btnTextEl.textContent = "Скачать Happ в App Store";
+          } else if (device.kind === "android") {
+            btnTextEl.textContent = "Скачать Happ в Google Play";
+          } else {
+            btnTextEl.textContent = "Скачать Happ";
+          }
+        }
+
+        downloadHappBtn.addEventListener("click", function (e) {
+          if (tg && typeof tg.openLink === "function") {
+            e.preventDefault();
+            tg.openLink(targetUrl);
+          }
+        });
+      }
 
       // Авторизация через Telegram Mini Apps
       initAuth();
@@ -756,12 +790,8 @@
         if (idEl) idEl.textContent = user.id || "—";
 
         if (avatarEl) {
-          if (user.photo_url) {
-            avatarEl.innerHTML = `<img src="${user.photo_url}" alt="Avatar" />`;
-          } else {
-            const initials = (user.first_name ? user.first_name[0] : "U").toUpperCase();
-            avatarEl.innerHTML = `<span>${initials}</span>`;
-          }
+          const initials = (user.first_name ? user.first_name[0] : "U").toUpperCase();
+          avatarEl.innerHTML = `<span>${initials}</span>`;
         }
 
         if (user.access_status) {
