@@ -635,7 +635,7 @@
       deviceLabelEl.textContent = device.label;
 
       const DOWNLOAD_URLS = {
-        ios: "https://apps.apple.com/tr/app/id6475630656",
+        ios: "itms-apps://apps.apple.com/app/id6475630656",
         android: "https://play.google.com/store/apps/details?id=com.happproxy",
         desktop: "https://happ.su/"
       };
@@ -657,6 +657,14 @@
         }
 
         downloadHappBtn.addEventListener("click", function (e) {
+          if (/^itms-apps:\/\//i.test(targetUrl)) {
+            if (tg && typeof tg.openLink === "function") {
+              try { tg.openLink(targetUrl); } catch (_) { window.location.href = targetUrl; }
+            } else {
+              window.location.href = targetUrl;
+            }
+            return;
+          }
           if (tg && typeof tg.openLink === "function") {
             e.preventDefault();
             tg.openLink(targetUrl);
