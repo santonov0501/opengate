@@ -46,6 +46,57 @@ flowchart TB
     RateLimit --> Auth
 ```
 
+## Диаграмма последовательности авторизации
+
+```plantuml
+@startuml
+actor User as "Пользователь"
+participant MiniApp as "Telegram Mini App"
+participant Backend as "OpenGate Backend"
+participant Cache as "In-Memory Cache"
+participant CryptoAPI as "Happ Crypto API"
+
+User -> MiniApp: Открывает Mini App
+MiniApp -> Backend: POST /auth/login\n(initData)
+Backend -> Backend: Проверка HMAC подписи
+Backend -> Backend: Проверка auth_date (24ч)
+Backend -> Backend: Создание сессии (Bearer token)
+Backend --> MiniApp: 200 OK\n{token, user, expires_at}
+MiniApp -> MiniApp: Сохранение token в localStorage
+
+note right of Backend
+  Rate limiting: 10 попыток/мин
+  TTL сессии: 24 часа
+end note
+
+User -> MiniApp: Нажимает "Создать подписку"
+MiniApp -> Backend: GET /subscription-link\n(Authorization: Bearer token)
+Backend -> Cache: Проверка кэша (5 мин TTL)
+alt Кэш есть
+    Cache --> Backend: Возвращает закэшированную ссылку
+else Кэша нет
+    Backend -> Backend: Проверка БД (24 часа TTL)
+    alt В БД есть
+        Backend --> Backend: Возвращает ссылку из БД
+    else В БД нет
+        Backend -> CryptoAPI: POST /api-v2.php\n(ключи, настройки)
+        CryptoAPI --> Backend: happ:// ссылка
+        Backend -> Backend: Сохранение в БД и кэш
+    end
+end
+Backend --> MiniApp: 200 OK\nhapp://crypt5/...
+
+MiniApp -> Backend: GET /subscription-redirect-url\n(Authorization: Bearer token)
+Backend --> MiniApp: Подписанный URL\n(expires, uid, sig)
+MiniApp -> User: tg.openLink(подписанный URL)
+User -> Backend: GET /subscription-redirect-302\n(expires, uid, sig)
+Backend -> Backend: Проверка подписи и expires
+Backend --> User: 302 Redirect на happ://
+User -> User: Системный промпт "Открыть в Happ?"
+
+@enduml
+```
+
 ## Компоненты
 
 ### 1. Авторизация (`verify_init_data`)

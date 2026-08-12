@@ -6,6 +6,85 @@ description: Модели данных OpenGate — структура базы 
 
 # Модели данных
 
+## ER диаграмма базы данных
+
+```plantuml
+@startuml
+!define table(x) class x << (T,#FFA500) >> {
+}
+!define entity(x) class x << (E,#ADD8E6) >> {
+}
+
+entity "users" as users {
+  *id : INTEGER
+  first_name : TEXT
+  last_name : TEXT
+  username : TEXT
+  photo_url : TEXT
+  access_status : TEXT
+  subscription_id : TEXT
+  created_at : TEXT
+  updated_at : TEXT
+  last_login_at : TEXT
+}
+
+entity "subscriptions" as subscriptions {
+  *id : TEXT
+  status : TEXT
+  title : TEXT
+  settings_json : TEXT
+  created_at : TEXT
+  updated_at : TEXT
+}
+
+entity "key_updates" as key_updates {
+  *id : INTEGER
+  source_url : TEXT
+  pulled_at : TEXT
+  raw_updated_at : TEXT
+  total_keys : INTEGER
+  status : TEXT
+  error : TEXT
+}
+
+entity "encrypted_links" as encrypted_links {
+  *user_id : INTEGER
+  encrypted_link : TEXT
+  expires_at : TEXT
+  updated_at : TEXT
+}
+
+users ||--o{ subscriptions : "использует"
+users ||--o| encrypted_links : "имеет"
+key_updates }o--|| users : "обновляет"
+
+note right of users
+  Таблица пользователей
+  Telegram Mini App
+  Primary Key: id (Telegram ID)
+end note
+
+note right of subscriptions
+  Таблица подписок
+  Настройки и статусы
+  Primary Key: id
+end note
+
+note right of key_updates
+  История обновлений ключей
+  Автоматические обновления
+  каждые 30 минут
+end note
+
+note right of encrypted_links
+  Кэш зашифрованных ссылок
+  TTL: 24 часа
+  Primary Key: user_id
+end note
+
+@enduml
+```
+
 ## Схема SQLite
 
 ```sql
