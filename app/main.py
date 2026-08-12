@@ -173,6 +173,7 @@ class AuthUser(BaseModel):
     last_name: str = ""
     username: str = ""
     photo_url: str = ""
+    access_status: str = "active"
 
 
 class LoginResponse(BaseModel):
