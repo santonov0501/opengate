@@ -30,7 +30,9 @@ const sidebars = {
     {
       type: 'category',
       label: 'API-спецификация',
-      items: ['api-spec/api-reference'],
+      items: [
+        'api-spec/api-reference',
+      ],
     },
   ],
 };

@@ -1,0 +1,804 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "OpenGate API",
+    "description": "API для управления подписками Happ через Telegram Mini App.\nПоддерживает авторизацию через Telegram WebApp, управление ключами,\nгенерацию подписок и deep links для Happ.\n",
+    "version": "1.0.0",
+    "contact": {
+      "name": "OpenGate"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8080",
+      "description": "Локальная разработка"
+    },
+    {
+      "url": "https://opengate.up.railway.app",
+      "description": "Продакшн"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "init_data"
+        ],
+        "properties": {
+          "init_data": {
+            "type": "string",
+            "description": "initData из window.Telegram.WebApp.initData"
+          }
+        }
+      },
+      "AuthUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 123456789
+          },
+          "first_name": {
+            "type": "string",
+            "example": "Иван"
+          },
+          "last_name": {
+            "type": "string",
+            "example": "Петров"
+          },
+          "username": {
+            "type": "string",
+            "example": "ivan_petrov"
+          },
+          "photo_url": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://..."
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "abc123..."
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUser"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-08-12T10:00:00Z"
+          }
+        }
+      },
+      "LogoutResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "example": true
+          }
+        }
+      },
+      "KeysStatus": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "example": "C:\\app\\data\\keys.json"
+          },
+          "exists": {
+            "type": "boolean",
+            "example": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-08-11T10:00:00Z"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "example": 1024
+          },
+          "total_keys": {
+            "type": "integer",
+            "example": 34
+          }
+        }
+      },
+      "CommandResult": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "python",
+              "scripts/pull_keys.py",
+              "--once"
+            ]
+          },
+          "returncode": {
+            "type": "integer",
+            "example": 0
+          },
+          "stdout": {
+            "type": "string",
+            "example": "..."
+          },
+          "stderr": {
+            "type": "string",
+            "example": ""
+          }
+        }
+      },
+      "SubscriptionServer": {
+        "type": "object",
+        "properties": {
+          "uri": {
+            "type": "string",
+            "example": "vless://..."
+          },
+          "remarks": {
+            "type": "string",
+            "example": "Region"
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "serverDescription": {
+                "type": "string",
+                "example": "Region"
+              }
+            }
+          }
+        }
+      },
+      "SubscriptionJson": {
+        "type": "object",
+        "properties": {
+          "subscription": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "example": "default"
+              },
+              "status": {
+                "type": "string",
+                "example": "active"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "example": {
+                  "profile-title": "OpenGate 123456789"
+                }
+              }
+            }
+          },
+          "servers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionServer"
+            }
+          }
+        }
+      },
+      "BuildSubscriptionRequest": {
+        "type": "object",
+        "properties": {
+          "active_minutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60,
+            "default": 5,
+            "description": "Время жизни процесса (1-60)"
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535,
+            "default": 8000,
+            "description": "Порт для сервера"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Название подписки"
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true,
+            "description": "Slug подписки"
+          },
+          "profile_title": {
+            "type": "string",
+            "nullable": true,
+            "description": "Заголовок профиля"
+          },
+          "force_restart": {
+            "type": "boolean",
+            "default": false,
+            "description": "Принудительный рестарт"
+          }
+        }
+      },
+      "ManagedScriptStatus": {
+        "type": "object",
+        "properties": {
+          "running": {
+            "type": "boolean",
+            "example": true
+          },
+          "pid": {
+            "type": "integer",
+            "nullable": true,
+            "example": 12345
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-08-11T10:00:00Z"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-08-11T10:05:00Z"
+          },
+          "public_url": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true,
+            "example": "https://example.ngrok-free.dev/subscription.txt"
+          },
+          "returncode": {
+            "type": "integer",
+            "nullable": true,
+            "example": 0
+          },
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "example": [
+              "python",
+              "-u",
+              "scripts/build_subscription.py",
+              "--serve",
+              "--port",
+              "8000"
+            ]
+          },
+          "logs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "Wrote data/subscription.txt (34 entries)",
+              "Public HTTPS URL (ngrok): https://example.ngrok-free.dev/subscription.txt"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Главная страница",
+        "description": "Возвращает Telegram Mini App фронтенд.",
+        "operationId": "getFrontend",
+        "responses": {
+          "200": {
+            "description": "HTML страница фронтенда",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Проверка работоспособности",
+        "description": "Проверка работоспособности сервиса.",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "Сервис доступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Вход через Telegram Mini Apps",
+        "description": "Вход через Telegram Mini Apps. Принимает `initData` из `window.Telegram.WebApp.initData`.\nСервер проверяет HMAC-подпись и выдаёт токен сессии.\n\n**Rate Limiting:** Максимум 10 попыток входа в минуту с одного IP.\nНастраивается через `LOGIN_RATE_LIMIT` и `LOGIN_RATE_WINDOW_SECONDS`.\n",
+        "operationId": "authLogin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешный вход",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Невалидная подпись initData"
+          },
+          "403": {
+            "description": "Доступ запрещён (не в ALLOWED_IDS)"
+          },
+          "429": {
+            "description": "Слишком много попыток входа"
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "summary": "Данные текущего пользователя",
+        "description": "Возвращает данные текущего пользователя (из сессии).",
+        "operationId": "authMe",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Данные пользователя",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUser"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Не авторизован"
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "summary": "Завершение сессии",
+        "description": "Завершает сессию.",
+        "operationId": "authLogout",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Сессия завершена",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Не авторизован"
+          }
+        }
+      }
+    },
+    "/keys/status": {
+      "get": {
+        "summary": "Статус ключей серверов",
+        "description": "Статус ключей серверов.",
+        "operationId": "keysStatus",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Статус ключей",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeysStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Не авторизован"
+          }
+        }
+      }
+    },
+    "/pull-keys": {
+      "post": {
+        "summary": "Обновление ключей",
+        "description": "Запускает обновление ключей из удалённого источника.\n\n**Автоматическое обновление:** Ключи автоматически обновляются каждые 30 минут через планировщик.\n",
+        "operationId": "pullKeys",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Результат выполнения команды",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Не авторизован"
+          },
+          "504": {
+            "description": "Таймаут команды"
+          }
+        }
+      }
+    },
+    "/subscription.txt": {
+      "get": {
+        "summary": "Текстовая подписка для Happ",
+        "description": "Возвращает текстовую подписку для Happ.\n\n**Доступ:** подписанный URL ИЛИ авторизованная сессия\n",
+        "operationId": "subscriptionTxt",
+        "parameters": [
+          {
+            "name": "expires",
+            "in": "query",
+            "description": "Срок действия (для подписанного URL)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "in": "query",
+            "description": "ID пользователя (для подписанного URL)",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sig",
+            "in": "query",
+            "description": "HMAC-подпись (для подписанного URL)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Текстовая подписка",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "#profile-title: OpenGate 123456789\n#profile-update-interval: 24\nvless://server1...\nvless://server2...\n"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Подписка не активна"
+          },
+          "404": {
+            "description": "Ключи не найдены"
+          }
+        }
+      }
+    },
+    "/subscription.json": {
+      "get": {
+        "summary": "JSON подписка для Happ",
+        "description": "Возвращает JSON-подписку для Happ.\n\n**Доступ:** подписанный URL ИЛИ авторизованная сессия\n",
+        "operationId": "subscriptionJson",
+        "parameters": [
+          {
+            "name": "expires",
+            "in": "query",
+            "description": "Срок действия (для подписанного URL)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "in": "query",
+            "description": "ID пользователя (для подписанного URL)",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sig",
+            "in": "query",
+            "description": "HMAC-подпись (для подписанного URL)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON подписка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionJson"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Подписка не активна"
+          },
+          "404": {
+            "description": "Ключи не найдены"
+          }
+        }
+      }
+    },
+    "/subscription-link": {
+      "get": {
+        "summary": "Happ deep link",
+        "description": "Возвращает рабочую Happ deep link для текущего пользователя.\n\n**Логика:**\n1. Проверка in-memory кэша (5 минут)\n2. Проверка БД (24 часа)\n3. Вызов crypto API (если нет в кэше/БД)\n",
+        "operationId": "subscriptionLink",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Happ deep link",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "happ://crypt5/fzvd6ovH6kXv8JwfbZTkkt9l1469Bt4ur1mGJXcE7rRtyf5RA9FXt0b0X82pvg..."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Не авторизован"
+          }
+        }
+      }
+    },
+    "/subscription-redirect-url": {
+      "get": {
+        "summary": "Подписанный URL для редиректа",
+        "description": "Возвращает подписанный URL на `/subscription-redirect-302`.\nФронт открывает этот URL через tg.openLink() в системном браузере,\nгде нет Bearer-токена, поэтому авторизация — это подпись в URL.\n",
+        "operationId": "subscriptionRedirectUrl",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Подписанный URL",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "https://opengate.up.railway.app/subscription-redirect-302?expires=1786549282&uid=123456789&sig=09f8917f..."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Не авторизован"
+          }
+        }
+      }
+    },
+    "/subscription-redirect-302": {
+      "get": {
+        "summary": "302-редирект на Happ deep link",
+        "description": "Мгновенный 302-редирект на Happ deep link.\nОткрывается через tg.openLink() в системном браузере. Сервер сразу\nвозвращает 302 на happ:// — браузер следует за редиректом и показывает\nсистемный промпт \"Открыть в Happ?\" без промежуточной HTML-страницы.\n\n**Доступ:** подписанный URL (expires + uid + sig)\n",
+        "operationId": "subscriptionRedirect302",
+        "parameters": [
+          {
+            "name": "expires",
+            "in": "query",
+            "required": true,
+            "description": "Срок действия",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "in": "query",
+            "required": true,
+            "description": "ID пользователя",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sig",
+            "in": "query",
+            "required": true,
+            "description": "HMAC-подпись",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Редирект на happ:// ссылку",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "description": "URL deep ссылки в Happ"
+              }
+            }
+          },
+          "401": {
+            "description": "Не авторизован / невалидная подпись"
+          }
+        }
+      }
+    },
+    "/build-subscription": {
+      "post": {
+        "summary": "Запуск сборки подписки",
+        "description": "Запускает процесс сборки подписки.",
+        "operationId": "buildSubscription",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuildSubscriptionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Статус процесса сборки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedScriptStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Не авторизован"
+          }
+        }
+      }
+    },
+    "/build-subscription/status": {
+      "get": {
+        "summary": "Статус процесса сборки подписки",
+        "description": "Статус процесса сборки подписки.",
+        "operationId": "buildSubscriptionStatus",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Статус процесса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedScriptStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Не авторизован"
+          }
+        }
+      }
+    },
+    "/build-subscription/stop": {
+      "post": {
+        "summary": "Остановка процесса сборки подписки",
+        "description": "Останавливает процесс сборки подписки.",
+        "operationId": "stopBuildSubscription",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Статус процесса после остановки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedScriptStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Не авторизован"
+          }
+        }
+      }
+    }
+  }
+}
