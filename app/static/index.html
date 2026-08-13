@@ -45,6 +45,35 @@
       justify-content: center;
     }
 
+    /* Blurred Background GIF Styles */
+    .bg-container {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      overflow: hidden;
+      background-color: var(--bg);
+    }
+
+    .bg-media {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 105%;
+      height: 105%;
+      object-fit: cover;
+      transform: translate(-50%, -50%) scale(1.18);
+      filter: blur(28px) brightness(0.55) saturate(1.25);
+      transition: opacity 0.5s ease;
+      will-change: transform, filter;
+    }
+
+    .bg-overlay {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 30%, rgba(15, 23, 42, 0.35) 0%, rgba(15, 23, 42, 0.82) 100%);
+    }
+
     .screen {
       width: 100%;
       max-width: 440px;
@@ -56,14 +85,16 @@
 
     /* Header Profile Card */
     .profile-card {
-      background: var(--secondary);
+      background: color-mix(in srgb, var(--secondary) 75%, transparent);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border: 1px solid var(--secondary-border);
       border-radius: 20px;
       padding: 16px;
       display: flex;
       align-items: center;
       gap: 14px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
       position: relative;
       overflow: hidden;
     }
@@ -169,13 +200,16 @@
     }
 
     .card {
-      background: var(--secondary);
+      background: color-mix(in srgb, var(--secondary) 75%, transparent);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border: 1px solid var(--secondary-border);
       border-radius: 18px;
       padding: 14px 16px;
       display: flex;
       flex-direction: column;
       gap: 12px;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
     }
 
     .row {
@@ -281,11 +315,14 @@
 
     /* Accordion FAQ */
     details.faq-item {
-      background: var(--secondary);
+      background: color-mix(in srgb, var(--secondary) 75%, transparent);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border: 1px solid var(--secondary-border);
       border-radius: 16px;
       overflow: hidden;
       transition: all 0.2s ease;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
     }
 
     details.faq-item summary {
@@ -378,7 +415,9 @@
       padding: 12px 16px;
       font-size: 0.92rem;
       font-weight: 600;
-      background: var(--secondary);
+      background: color-mix(in srgb, var(--secondary) 80%, transparent);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       color: var(--text);
       cursor: pointer;
       width: 100%;
@@ -443,6 +482,13 @@
   </style>
 </head>
 <body>
+  <!-- Blurred Background GIF -->
+  <div class="bg-container" id="bg-container">
+    <canvas id="bg-canvas" class="bg-media"></canvas>
+    <img id="bg-img" class="bg-media" src="/static/background.gif" alt="" style="display: none;" />
+    <div class="bg-overlay"></div>
+  </div>
+
   <div class="screen">
 
     <!-- Header User Profile Card -->
@@ -536,6 +582,56 @@
 
   <script>
     (function () {
+      initSlowGif("/static/background.gif", 10);
+
+      function initSlowGif(gifUrl, targetFps) {
+        const canvas = document.getElementById("bg-canvas");
+        const fallbackImg = document.getElementById("bg-img");
+        if (!canvas) return;
+
+        if (!("ImageDecoder" in window)) {
+          if (fallbackImg) fallbackImg.style.display = "block";
+          canvas.style.display = "none";
+          return;
+        }
+
+        fetch(gifUrl)
+          .then((res) => {
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            return res.arrayBuffer();
+          })
+          .then(async (buffer) => {
+            const decoder = new ImageDecoder({ data: buffer, type: "image/gif" });
+            await decoder.tracks.ready;
+            const track = decoder.tracks.selectedTrack;
+            const totalFrames = track.frameCount;
+            if (!totalFrames) throw new Error("No frames found");
+
+            const firstFrame = await decoder.decode({ frameIndex: 0 });
+            canvas.width = firstFrame.image.codedWidth || firstFrame.image.width || 960;
+            canvas.height = firstFrame.image.codedHeight || firstFrame.image.height || 540;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(firstFrame.image, 0, 0);
+            firstFrame.image.close();
+
+            let currentFrame = 0;
+            const intervalMs = 1000 / (targetFps || 10);
+
+            setInterval(async () => {
+              try {
+                const result = await decoder.decode({ frameIndex: currentFrame });
+                ctx.drawImage(result.image, 0, 0);
+                result.image.close();
+                currentFrame = (currentFrame + 1) % totalFrames;
+              } catch (_) {}
+            }, intervalMs);
+          })
+          .catch(() => {
+            if (fallbackImg) fallbackImg.style.display = "block";
+            canvas.style.display = "none";
+          });
+      }
+
       const TOKEN_KEY = "happ_sub_token";
 
       const keysUpdatedEl = document.getElementById("keys-updated");
