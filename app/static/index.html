@@ -7,16 +7,16 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
-      --bg: #0f172a;
-      --text: #f8fafc;
-      --hint: #94a3b8;
-      --button: #3b82f6;
+      --bg: #ffffff;
+      --text: #0f172a;
+      --hint: #64748b;
+      --button: #2563eb;
       --button-text: #ffffff;
-      --secondary: #1e293b;
-      --secondary-border: rgba(255, 255, 255, 0.08);
+      --secondary: #ffffff;
+      --secondary-border: rgba(0, 0, 0, 0.08);
       --danger: #ef4444;
-      --ok: #22c55e;
-      --warning: #f59e0b;
+      --ok: #16a34a;
+      --warning: #d97706;
       --safe-top: env(safe-area-inset-top, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
@@ -56,18 +56,24 @@
       pointer-events: none;
       overflow: hidden;
       background-color: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .bg-media {
       position: absolute;
       top: 50%;
       left: 50%;
-      width: 105%;
-      height: 105%;
-      object-fit: cover;
-      transform: translate(-50%, -50%) scale(1.15);
-      filter: blur(20px) brightness(0.7) saturate(1.2);
-      opacity: 0.85;
+      width: 100vh;
+      height: 100vw;
+      max-width: 850px;
+      max-height: 850px;
+      object-fit: contain;
+      transform: translate(-50%, -50%) rotate(90deg) scale(1.1);
+      filter: blur(36px) saturate(1.8) contrast(1.1) brightness(1.02);
+      opacity: 0.9;
+      mix-blend-mode: multiply;
       transition: opacity 0.5s ease;
       will-change: transform, filter;
     }
@@ -75,7 +81,7 @@
     .bg-overlay {
       position: absolute;
       inset: 0;
-      background: radial-gradient(circle at 50% 30%, rgba(15, 23, 42, 0.2) 0%, rgba(15, 23, 42, 0.65) 100%);
+      background: radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.45) 100%);
       pointer-events: none;
     }
 
@@ -90,16 +96,16 @@
 
     /* Header Profile Card */
     .profile-card {
-      background: color-mix(in srgb, var(--secondary) 75%, transparent);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--secondary-border);
       border-radius: 20px;
       padding: 16px;
       display: flex;
       align-items: center;
       gap: 14px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
       position: relative;
       overflow: hidden;
     }
@@ -205,16 +211,16 @@
     }
 
     .card {
-      background: color-mix(in srgb, var(--secondary) 75%, transparent);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--secondary-border);
       border-radius: 18px;
       padding: 14px 16px;
       display: flex;
       flex-direction: column;
       gap: 12px;
-      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
     }
 
     .row {
@@ -320,14 +326,14 @@
 
     /* Accordion FAQ */
     details.faq-item {
-      background: color-mix(in srgb, var(--secondary) 75%, transparent);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--secondary-border);
       border-radius: 16px;
       overflow: hidden;
       transition: all 0.2s ease;
-      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
     }
 
     details.faq-item summary {
@@ -420,7 +426,7 @@
       padding: 12px 16px;
       font-size: 0.92rem;
       font-weight: 600;
-      background: color-mix(in srgb, var(--secondary) 80%, transparent);
+      background: rgba(255, 255, 255, 0.85);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       color: var(--text);
