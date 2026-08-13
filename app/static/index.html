@@ -25,7 +25,7 @@
       box-sizing: border-box;
     }
 
-    html, body {
+    html {
       margin: 0;
       min-height: 100%;
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -36,6 +36,7 @@
     }
 
     body {
+      margin: 0;
       min-height: 100dvh;
       padding:
         calc(16px + var(--safe-top))
@@ -43,6 +44,8 @@
         calc(20px + var(--safe-bottom));
       display: flex;
       justify-content: center;
+      background: transparent;
+      color: var(--text);
     }
 
     /* Blurred Background GIF Styles */
@@ -62,8 +65,9 @@
       width: 105%;
       height: 105%;
       object-fit: cover;
-      transform: translate(-50%, -50%) scale(1.18);
-      filter: blur(28px) brightness(0.55) saturate(1.25);
+      transform: translate(-50%, -50%) scale(1.15);
+      filter: blur(20px) brightness(0.7) saturate(1.2);
+      opacity: 0.85;
       transition: opacity 0.5s ease;
       will-change: transform, filter;
     }
@@ -71,7 +75,8 @@
     .bg-overlay {
       position: absolute;
       inset: 0;
-      background: radial-gradient(circle at 50% 30%, rgba(15, 23, 42, 0.35) 0%, rgba(15, 23, 42, 0.82) 100%);
+      background: radial-gradient(circle at 50% 30%, rgba(15, 23, 42, 0.2) 0%, rgba(15, 23, 42, 0.65) 100%);
+      pointer-events: none;
     }
 
     .screen {
@@ -484,8 +489,8 @@
 <body>
   <!-- Blurred Background GIF -->
   <div class="bg-container" id="bg-container">
-    <canvas id="bg-canvas" class="bg-media"></canvas>
-    <img id="bg-img" class="bg-media" src="/static/background.gif" alt="" style="display: none;" />
+    <canvas id="bg-canvas" class="bg-media" style="display: none;"></canvas>
+    <img id="bg-img" class="bg-media" src="background.gif" alt="" />
     <div class="bg-overlay"></div>
   </div>
 
@@ -582,7 +587,7 @@
 
   <script>
     (function () {
-      initSlowGif("/static/background.gif", 10);
+      initSlowGif("background.gif", 10);
 
       function initSlowGif(gifUrl, targetFps) {
         const canvas = document.getElementById("bg-canvas");
@@ -590,8 +595,6 @@
         if (!canvas) return;
 
         if (!("ImageDecoder" in window)) {
-          if (fallbackImg) fallbackImg.style.display = "block";
-          canvas.style.display = "none";
           return;
         }
 
@@ -614,6 +617,9 @@
             ctx.drawImage(firstFrame.image, 0, 0);
             firstFrame.image.close();
 
+            canvas.style.display = "block";
+            if (fallbackImg) fallbackImg.style.display = "none";
+
             let currentFrame = 0;
             const intervalMs = 1000 / (targetFps || 10);
 
@@ -626,10 +632,7 @@
               } catch (_) {}
             }, intervalMs);
           })
-          .catch(() => {
-            if (fallbackImg) fallbackImg.style.display = "block";
-            canvas.style.display = "none";
-          });
+          .catch(() => {});
       }
 
       const TOKEN_KEY = "happ_sub_token";
